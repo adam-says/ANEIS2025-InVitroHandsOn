@@ -5,8 +5,9 @@
 
 % OUTPUT:
 %   out - struct containing:
-%       time_ms: bin centers in msec
-%       isi: The ISI distribution per bin, as probability
+%       time_ms: bin centers, in msec
+%       isi: all inter-spike intervals computed, in msec
+%       isiDist: The ISI distribution per bin, as probability
 
 % Aug 2025, Alessio Di Clemente & Adam Armada-Moreira
 
