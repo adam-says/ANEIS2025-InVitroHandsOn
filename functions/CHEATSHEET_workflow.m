@@ -289,7 +289,6 @@ ylabel('Time (ms)','FontSize',14)
 % Session 3
 %  =±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±
 
-
 %% BURST Profiling: use the provided function to generate an array with all the bursts profiles 
 % (spike time histograms) from a single recording alignining them at their start or at their peak.
 % 
@@ -314,6 +313,9 @@ ylabel('Time (ms)','FontSize',14)
 % the average one in red
 
 [burst_profiles,profiling_parameters,mean_burst] = burstProfiling(allspks,BURST,STH.bin,"peak",0);
+
+%% Do it yourself see how the average burst and the alignment change with the two methods
+%try to put show == 1
 
 %% Do it yourself: smooth burst profiles
 % suggestion: use smoothdata function
@@ -368,7 +370,6 @@ MaxRiseSlopes = cellfun(@max,RiseSlopes);
 
 %% (optional) Do It Yourself: plot burst, smoothed burst, derivative and max slope to check
 
-
 for j = 1:height(BURST)
 
     [~,peakIdx] = max(smoothedbursts(j,:));
@@ -376,6 +377,7 @@ for j = 1:height(BURST)
     [~,maxslopeIdx] = max(slope);
 
     tiledlayout(2,1,'TileSpacing','tight')
+    
     nexttile
     plot(burst_profiles(j,1:peakIdx),'k-')
     hold on
