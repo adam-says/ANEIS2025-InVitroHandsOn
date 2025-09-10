@@ -149,7 +149,7 @@ function bursts = detectBursts(STH,peakThr,detectThr,wait_time,minDuration,N_act
     idx_StartPeakEnd = [burst_start_idx burst_peak_idx burst_end_idx];
 
 
-    bursts = table(burst_N, idx_StartPeakEnd, N_spikes, burst_durations_ms, burst_start_ms, ...
+    bursts = table(burst_N, idx_StartPeakEnd, N_spikes, amplitude_Nspikes, burst_durations_ms, burst_start_ms, ...
         burst_peak_ms, burst_end_ms, TimeToPeak_ms, halfDecay_ms, FWHM_ms);
 
 
