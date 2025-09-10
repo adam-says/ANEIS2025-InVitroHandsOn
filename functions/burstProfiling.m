@@ -6,7 +6,10 @@
 % 2) bursts -> table with start and end of all the bursts in ms
 % (burst_start_ms, burst_end_ms)
 % 3) binsize -> size of the temporal bin to use generate burst profiles
-% 4) show -> if show == 0 don't show figures, if show == 1 show figure and
+% 4) alignment -> string scalar or char vector defining the alignment
+% method for the burst profiles: "start" 0 aligned at their start, "peak" =
+% aligned at their peak
+% 5) show -> if show == 0 don't show figures, if show == 1 show figure and
 % pause
 %
 % OUTPUT:
@@ -19,7 +22,7 @@
 
 
 
-function varargout = burstProfiling(allspks, bursts, binsize, show)
+function varargout = burstProfiling(allspks, bursts, binsize, alignment, show)
 
     spiketrain = allspks(:,1);
     plot_extBefore = 100;     %--number of ms include before
@@ -64,40 +67,51 @@ function varargout = burstProfiling(allspks, bursts, binsize, show)
         burst_profile(end+1:burst_max_ext) = 0;
 
         burstProfiles(i,:) = burst_profile;
-        x_axis = (0:binsize:(burst_max_ext-1)*binsize);
 
-        plot(x_axis, burst_profile,'-', 'color',[0.6 0.6 0.6])
+    end
+
+    if strcmp(alignment,"start") == 1
+            varargout{1} = burstProfiles;
+        
+    elseif strcmp(alignment,"peak") == 1
+            burstProfiles = alignToPeak(burstProfiles);
+            varargout{1} = burstProfiles;
+    else
+        disp('chose either "start" or "peak" for input variable "alignment"')
+    end
+
+    for j = 1:height(bursts)
+
+        time_ms = (0:binsize:(size(burstProfiles,2)*binsize)-1);
+
+        plot(time_ms, burstProfiles(j,:),'-', 'color',[0.6 0.6 0.6])
         hold on
 
         if show == 1
-            pause
-            disp('press any key to continue')
-        end
+           pause
+           disp('press any key to continue')
+        end                
+     end
 
-    end
-
-    varargout{1} = burstProfiles;
-
-    if nargout >= 2
-
+     if nargout >= 2      
         burstProfiling_parameters = table(plot_extBefore,plot_extAfter,binsize);
-        varargout{2} = burstProfiling_parameters;
-
-    end
-
-    if nargout >= 3    
+        varargout{2} = burstProfiling_parameters;        
+     end
+        
+     if nargout >= 3    
         mean_burst = mean(burstProfiles);
-        plot(x_axis,mean_burst,'r-','linewidth',2)
+        plot(time_ms,mean_burst,'r-','linewidth',2)
         varargout{3} = mean_burst;    
-    end
-
-    set(burstsplot, 'visible', 'on')
-    ax = gca;
-    ax.TickDir = "out";
-    ax.FontWeight = "bold";
-    ax.FontSize = 12;
-    set(gca,'TickLabelInterpreter', 'none');
-    ylabel('# Spikes','FontSize',14)
-    xlabel('Time (ms)','FontSize',14)    
+     end
+        
+     set(burstsplot, 'visible', 'on')
+     ax = gca;
+     ax.TickDir = "out";
+     ax.FontWeight = "bold";
+     ax.FontSize = 12;
+     set(gca,'TickLabelInterpreter', 'none');
+     ylabel('# Spikes','FontSize',14)
+     xlabel('Time (ms)','FontSize',14)
 
 end
+

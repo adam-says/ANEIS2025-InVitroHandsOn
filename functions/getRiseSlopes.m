@@ -1,4 +1,4 @@
-% Generate a vector with the max rising slopes of the input bursts
+% Generate a matrix with the rising slopes of the input bursts
 % INPUT:
 % 1) smoothedBursts -> a cell array of burst profiles smoothed to avoid
 % noisy oscillations
@@ -8,31 +8,32 @@
 % rising slopes on burst normalized by their amplitude or not
 %
 % OUTPUT:
-% a vector with the max rising slopes of each burst (relative or absolute)
+% a cell array with the rising slopes (i.e. first order derivatives) of each burst (relative or absolute)
+% over time. Each cell hosts the rising slope of one burst from burst profiles
 
-function MaxRiseSlopes = MaxRiseSlopes(smoothedBursts,binsize,normalize)
+function RiseSlopes = getRiseSlopes(smoothedbursts,binsize,normalize)
 
-    MaxRiseSlopes = zeros(size(smoothedBursts,1),1);
+    RiseSlopes = cell(size(smoothedbursts,1),1);
     
-    for b = 1:size(smoothedBursts,1)
+    for b = 1:size(smoothedbursts,1)
     
-        burst_profile = smoothedBursts(b,:);
+        burst_profile = smoothedbursts(b,:);
         [peak_ampl, peak_idx] = max(burst_profile);
         
         if strcmp(normalize,'yes')
             burst_profile = burst_profile/peak_ampl;
         end
+
         Burst_rise = burst_profile(1:peak_idx);
     
         RiseSlope_dt = diff(Burst_rise)/binsize^2;
-        maxSlope = max(RiseSlope_dt);
 
         if isempty(RiseSlope_dt) == 1
-           MaxRiseSlopes(b) = nan;
+           RiseSlopes(b) = nan;
            continue
         end
 
-        MaxRiseSlopes(b) = maxSlope; 
+        RiseSlopes{b} = RiseSlope_dt; 
 
     end
 

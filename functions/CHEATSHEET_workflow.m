@@ -212,7 +212,27 @@ FR_nonburst = 1 / ISI_interval(2) * 1000;
 % Session 2
 %  =±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±
 
-%% Burst detection
+%% Burst detection: use the provided function to detect bursts from the STH of the recording
+
+% INPUT:
+% 1) STH -> struct file with fields 'network'= spike times histogram and
+% 'bin' = size of the temporal bin used to produce the histogram
+% 2) peakThr -> scalar number, minimum burst peak amplitude expressed as fraction of the
+% active electrodes
+% 3) detectThr -> scalar number, minimum threshold to consider a bin as
+% a candidate member of a burst expressed as fraction of active channels
+% 4) wait_time -> scalar number, expressed in ms and used to determine
+% burst ends before after the peak. A burst ends when the STH stays below
+% detectThr for at least wait_time
+% 5) minDuration -> scalar number, minimum burst duration, expressed in ms
+% 6) N_activeElec -> number of active electrodes in the recording
+%
+% OUTPUT:
+% table with: burst number, index of start, peak and end of each burst in
+% the STH, total number of spikes in the burst, burst duration in ms, burst
+% start and end in ms, Time to peak, half decay time and full width at half
+% maximum in ms
+
 detectThr = 0.01;
 peakThr = 0.15;
 minDuration = 100;
@@ -220,15 +240,317 @@ wait_time = 50;
 
 BURST = detectBursts(STH,peakThr,detectThr,wait_time,minDuration,NactiveElectrodes);
 
-%% Burst profilling
+%% Do it yourself: check burst detection, extract stats and plot one or more burst parameters
+
+%-plot and check what you detected using BURST variables
+burstCheck = figure;
+plot(STH.time,STH.network,'b-')
+hold on
+
+for p = 1:height(BURST)
+
+    plot(BURST.burst_peak_ms(p),BURST.amplitude_Nspikes(p),'*r')
+    plot([BURST.burst_start_ms(p) BURST.burst_start_ms(p)],[0 120],'-g')
+    plot([BURST.burst_end_ms(p) BURST.burst_end_ms(p)],[0 120],'-r')
+    plot([0 max(STH.time)],[detectThr*NactiveElectrodes detectThr*NactiveElectrodes],'g--')
+    plot([0 max(STH.time)],[peakThr*NactiveElectrodes peakThr*NactiveElectrodes],'r--')
+
+end
+
+%-extract statistics and plot variables
+meanDuration = mean(BURST.TimeToPeak_ms);
+medianDuration = median(BURST.TimeToPeak_ms);
+sdDuration = std(BURST.TimeToPeak_ms);
+iqrDuration = iqr(BURST.TimeToPeak_ms);
+
+meanAmpl = mean(BURST.halfDecay_ms);
+medianAmpl = median(BURST.halfDecay_ms);
+sdAmpl = std(BURST.halfDecay_ms);
+iqrAmpl =  iqr(BURST.halfDecay_ms);
+
+violins = figure;
+violinplot(BURST(:,["TimeToPeak_ms","halfDecay_ms"]))
+
+ax = gca;
+ax.TickDir = "out";
+ax.FontWeight = "bold";
+ax.FontSize = 12;
+set(gca,'TickLabelInterpreter', 'none');
+ylabel('Time (ms)','FontSize',14)
+
+%% (optional) do it yourself: perform burst detection on the other dataset 
+% and investigate the difference in one or more burst parameters
+% easiest strategy: run the code twice and save burst table with different
+% names
+% better strategy: do it programmatically in loop
+
 
 %% =±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±
 % Session 3
 %  =±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±
 
-%% Burst slope
 
-%% Burst oscillations
+%% BURST Profiling: use the provided function to generate an array with all the bursts profiles 
+% (spike time histograms) from a single recording alignining them at their start or at their peak.
+% 
+% INPUT
+% 1) allspks -> column vector where the first column are the spiketimes and
+% the second one the ID of the electrode
+% 2) bursts -> table with start and end of all the bursts in ms
+% (burst_start_ms, burst_end_ms)
+% 3) binsize -> size of the temporal bin to use generate burst profiles
+% 4) alignment -> string scalar or char vector defining the alignment
+% method for the burst profiles: "start" 0 aligned at their start, "peak" =
+% aligned at their peak
+% 5) show -> if show == 0 don't show figures, if show == 1 show figure and
+% pause
+%
+% OUTPUT:
+% 1) an array with all the bursts profiles (spike times histogram
+% and their plot
+% 2) (optional) a table with the parameters used to generate the profiles
+% 3) (optional) an array with the average burst calculated as point-bypoint average
+% of all the bursts aligned at their start. Their relative plot will show
+% the average one in red
+
+[burst_profiles,profiling_parameters,mean_burst] = burstProfiling(allspks,BURST,STH.bin,"peak",0);
+
+%% Do it yourself: smooth burst profiles
+% suggestion: use smoothdata function
+% try different strategies to smooth burst profiles and plot to see the
+% result
+
+% option 1: moving mean or median
+smoothedbursts = smoothdata(burst_profiles,2,'movmean',21);
+% option 2: smoothing by fitting data with lowess/loess or other models
+smoothedbursts = smoothdata(burst_profiles,2,'lowess',21);
+% option 3: smoothig with savitzky-golay filter
+smoothedbursts = sgolayfilt(burst_profiles',5,21)';
+
+%-plot bursts and smoothed bursts to check, pausing on each one
+for b = 1:height(BURST)
+
+    time_ms = (0:STH.bin:(size(burst_profiles,2)*STH.bin)-1);
+    plot(time_ms, burst_profiles(b,:),'k-')
+    hold on
+    plot(time_ms, smoothedbursts(b,:),'r-')
+    pause
+    close
+
+end
+
+%% Burst slope: use the provided function to calculate burst onset slope.
+% do it with bursts normalized to their peak (relative slope) or not
+% normalized (absolute slope)
+% INPUT:
+% 1) smoothedBursts -> a cell array of burst profiles smoothed to avoid
+% noisy oscillations
+% 2) binsize -> size of the temporal bins used to generate the burst
+% profiles
+% 3) normalize -> 'yes' or 'no' depending if you want to calculate the
+% rising slopes on burst normalized by their amplitude or not
+%
+% OUTPUT:
+% a cell array with the rising slopes (i.e. first order derivatives) of each burst (relative or absolute)
+% over time. Each cell hosts the rising slope of one burst from burst profiles
+
+
+%option 1: without normalization
+RiseSlopes = getRiseSlopes(smoothedbursts,STH.bin,'No');
+
+%option 2: normalizing the bursts at their peak
+NormRiseSlopes = RiseSlopes(smoothedBursts,2,'yes');
+
+%% Do it yourself: take the maximum of the derivatives and store them in an array
+
+MaxRiseSlopes = cellfun(@max,RiseSlopes);
+
+
+%% (optional) Do It Yourself: plot burst, smoothed burst, derivative and max slope to check
+
+
+for j = 1:height(BURST)
+
+    [~,peakIdx] = max(smoothedbursts(j,:));
+    slope = RiseSlopes{j};
+    [~,maxslopeIdx] = max(slope);
+
+    tiledlayout(2,1,'TileSpacing','tight')
+    nexttile
+    plot(burst_profiles(j,1:peakIdx),'k-')
+    hold on
+    plot(smoothedbursts(j,1:peakIdx),'r-','Linewidth',1.5)
+    plot([maxslopeIdx maxslopeIdx], [0 max(burst_profiles(j,1:peakIdx))],'g--','LineWidth',1.5)
+    ax = gca;
+    ax.TickDir = "out";
+    ax.FontWeight = "bold";
+    ax.FontSize = 12;
+    set(gca,'TickLabelInterpreter', 'none');
+    legend('burst','smoothed burst','max rise slope','Location','northwest')
+    xlim([0 length(smoothedbursts(1:peakIdx))])
+
+    nexttile
+    plot(slope,'r-','LineWidth',1.5)
+    hold on
+    xlim([0 length(smoothedbursts(1:peakIdx))])
+    pause
+    
+end
+
+%% Do it yourself: calculate rising slopes in the two dataset and check if they are different
+% do it with and without normalization
+% again 2 strategies:
+% easier: do it 2 times assigning different names to the riseslope
+% variables
+% better: do it in a loop
+
+%% Burst oscillations: use the provided function to obtain fast and slow oscillations from the bursts
+% Separate fast and slow components of the burst decay via surrogate
+% spike-train jittering approach
+%
+% INPUT:
+% 1) bursts -> table with info on all detected bursts. in particular needs
+% to have variables 'burst_peak_ms','burst_end_ms','burst_durations_ms',
+% 'TimeToPeak_ms'
+% 2) spiketrain -> vector with all spike times from the entire recording
+% 3) binsize -> width of the temporal bin to use for burst profiling
+%
+% OUTPUT:
+% A matrix containing only fast oscillations and another one with slow
+% oscillations
+
+[fastOscillations, slowOscialltions] = getFastandSlow(BURST,allspks,STH.bin);
+
+%% Do it Yourself: plot original burst (fast+slow oscillations), fast and slow oscillations
+
+for j = 1:height(BURST)
+
+    fast = fastOscillations(j,:);
+    slow = slowOscialltions(j,:);
+    burst = slow+fast;
+    time_ms = 0:STH.bin:(length(fast)*binsize)-1;
+
+    tiledlayout(2,1,'TileSpacing','tight')
+
+    nexttile
+    plot(time_ms,burst,'k-')
+    hold on
+    plot(time_ms,slow,'r--','LineWidth',1.5)
+    xlabel('time (ms)')
+    ylabel('# spikes')
+    ax = gca;
+    ax.TickDir = "out";
+    ax.FontWeight = "bold";
+    ax.FontSize = 12;
+    set(gca,'TickLabelInterpreter', 'none');
+ 
+
+    nexttile
+    plot(time_ms,fast,'b-')
+    xlabel('time (ms)')
+    ylabel('# spikes')
+    ax = gca;
+    ax.TickDir = "out";
+    ax.FontWeight = "bold";
+    ax.FontSize = 12;
+    set(gca,'TickLabelInterpreter', 'none');
+
+    pause
+ 
+end
+
+%% Spectrograms and power spectrum density
+
+% example of spectrogram function usage
+Fs = STH.fs;
+windowLength = 20;
+overlap = 10;
+nfft = 256;
+
+fast = fastOscillations(b,:);
+fast_time_s = (0:binsize:length(fast)*binsize-1)/1000;
+[~,Fr,Time,power] = spectrogram(fast,windowLength,overlap,nfft,Fs,'yaxis');
+PSD = mean(power,2);
+[~,dominantFrequency_idx] = max(PSD);
+dominantFrequency = Fr(dominantFrequency_idx);
+
+%--plot
+tiledlayout(3,1,'TileSpacing','tight')
+
+nexttile
+imagesc(Time, Fr, power);
+axis xy;
+xlabel('Time (s)');
+ylabel('Frequency (Hz)');
+title(sprintf('Spectrogram (power) — burst %d', b));
+colorbar;
+colormap(jet);
+ylim([10 100]);
+
+nexttile
+plot(fast_time_s,fast,'b-')
+xlim([Time(1) Time(end)])
+xlabel('Time (s)');
+title(sprintf('fast oscillation — burst %d', b));
+
+nexttile
+plot(Fr,PSD,'r-')
+xlabel('Frequency (Hz)');
+ylabel('Power')
+title(sprintf('Power Spectrum Density — burst %d', b));
+
+%% Do it yourself: put the code above in a loop to obtain all spectrograms
+
+[~,Fr,Time] = spectrogram(fastOscillations(1,:),windowLength,overlap,nfft,Fs,'yaxis');
+
+nsignals = height(bursts);
+
+spectrograms = zeros(length(Fr),length(Time),nsignals);
+PSDs = zeros(nsignals,length(Fr));
+dominantFrequencies = zeros(nsignals,1);
+
+for k = 1:nsignals
+    
+    [~,~,~,power] = spectrogram(fastOscillations(k,:),windowLength,overlap,nfft,fs,'yaxis');
+    spectrograms(:,:,k) = power;
+
+    PSDs(k,:) = mean(power,2);
+    [~,dominantFrequency_idx] = max(PSDs(k,:));
+    dominantFrequencies(k) = Fr(dominantFrequency_idx);
+
+    oscillationTime_s = (0:binsize:length(fastOscillations(k,:))*binsize-1)/1000;
+
+    tiledlayout(3,1,'TileSpacing','tight')
+
+    nexttile
+    imagesc(Time, Fr, power);
+    axis xy;
+    xlabel('Time (s)');
+    ylabel('Frequency (Hz)');
+    title(sprintf('Spectrogram (power) — burst %d', k));
+    colorbar;
+    colormap(jet);
+    ylim([10 100]);
+    
+    nexttile
+    plot(oscillationTime_s,fastOscillations(k,:),'b-')
+    xlim([Time(1) Time(end)])
+    xlabel('Time (s)');
+    title(sprintf('fast oscillation — burst %d', k));
+
+    nexttile
+    plot(Fr,PSDs(k,:),'r-')
+    xlabel('Frequency (Hz)');
+    ylabel('Power')
+    title(sprintf('Power Spectrum Density — burst %d', k));
+
+    pause
+    
+end
+
+
+%% (optional) Do it yourself find dominant frequency in the two datasets and compare
+% usual two strategies: hard coding or loop
 
 %% =±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±
 % Session 4

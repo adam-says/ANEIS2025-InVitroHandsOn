@@ -1,4 +1,4 @@
-% Filter slow components of the burst decay via a montecarlo-like process
+% Separate fast and slow components of the burst decay via a montecarlo-like process
 %
 % INPUT:
 % 1) bursts -> table with info on all detected bursts. in particular needs
@@ -8,40 +8,46 @@
 % 3) binsize -> width of the temporal bin to use for burst profiling
 %
 % OUTPUT:
-% A matrix containing only fast oscillations and anothe one with burst
-% decays
+% A matrix containing only fast oscillations and another one with slow
+% oscillations
 
 
-function [fastOscillations,burstDecays] = getFastOscillations(bursts,spiketrain,binsize)
+function [fastOscillations,slowOscillations] = getFastandSlow(bursts,spiketrain,binsize)
 
     N_bursts = height(bursts);
     spiketrain = spiketrain(:,1);
 
-    burst_peaks = bursts.burst_peak_ms;
+    burst_starts = bursts.burst_start_ms;
     burst_ends = bursts.burst_end_ms;
 
-    decaytimes = bursts.burst_durations_ms-bursts.TimeToPeak_ms;
-    plot_extAfter_ms = 100;
-    burst_max_ext = max(decaytimes)/binsize;
-    burst_max_ext = round(burst_max_ext+2*(plot_extAfter_ms/binsize));
+    plot_ext_ms = 150;
+    burst_max_ext = max(bursts.burst_durations_ms)/binsize;
+    burst_max_ext = round(burst_max_ext+2*(plot_ext_ms/binsize));
 
     rep = 150;
 
     allmeanfakebursts = zeros(N_bursts,burst_max_ext);
-    burstDecays = zeros(N_bursts,burst_max_ext);
+
+    burst_profiles = zeros(N_bursts,burst_max_ext);
 
     for n = 1:height(bursts)
 
-        if burst_ends(n) + plot_extAfter_ms >= max(spiketrain)
+        if burst_starts(n) - plot_ext_ms <= 0
+            ext_start = burst_starts(n);
+            ext_end = burst_ends(n)+plot_ext_ms;
+
+        elseif burst_ends(n) + plot_ext_ms >= max(spiketrain)
+            ext_start = burst_starts(n)-plot_ext_ms;
             ext_end = burst_ends(n);
+
         else
-            ext_end = burst_ends(n)+plot_extAfter_ms;
+            ext_start = burst_starts(n)-plot_ext_ms;
+            ext_end = burst_ends(n)+plot_ext_ms;
+
         end
 
-        peak_ms = burst_peaks(n);
-
-        burst_spikes = spiketrain(spiketrain >= peak_ms & spiketrain <= ext_end);
-        edges = peak_ms:binsize:ext_end;
+        burst_spikes = spiketrain(spiketrain >= ext_start & spiketrain <= ext_end);
+        edges = ext_start:binsize:ext_end;
         burst_profile = histcounts(burst_spikes,edges);
 
         burst_spikes_repmat = repmat(burst_spikes,1,rep);
@@ -60,12 +66,11 @@ function [fastOscillations,burstDecays] = getFastOscillations(bursts,spiketrain,
         burst_profile(end+1:burst_max_ext) = 0;
 
         allmeanfakebursts(n,:) = meanfakeburst;
-        burstDecays(n,:) = burst_profile;
+        burst_profiles(n,:) = burst_profile;
 
     end
 
-    fastOscillations = burstDecays-allmeanfakebursts;
-
-
+    fastOscillations = burst_profiles-allmeanfakebursts;
+    slowOscillations = allmeanfakebursts;
 
 end
