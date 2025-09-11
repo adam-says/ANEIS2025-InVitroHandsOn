@@ -142,6 +142,7 @@ smoothISIdist = movmean(ISI.isiDist, 6);
 [pks,locs] = findpeaks(smoothISIdist(13:end), ISI.time_ms(13:end),...
     'NPeaks', 2,...
     'MinPeakDistance',100,...
+    'MinPeakProminence',0.001,...
     'WidthReference','halfheight');
 
 ISI_pks = pks;
@@ -150,6 +151,9 @@ ISI_interval = locs;
 %% Now we can determine the area under the curve to compute the cumulative
 % probability of finding ISI within the main ranges
 % For that, we will use the half-height as our boundaries
+ISI_rangeEnd = [];
+ISI_rangeStart = [];
+ISI_probability = [];
 for i = 1:numel(ISI_interval)
     pk_idx = find(ISI.time_ms == ISI_interval(i));
     halfheight = ISI_pks(i) / 2;
@@ -162,17 +166,18 @@ for i = 1:numel(ISI_interval)
     ISI_probability(i) = prob;
 end
 %
+figure
 plot(ISI.time_ms, smoothISIdist)
 hold on
 scatter(ISI_interval, ISI_pks,'filled')
-for i = 1:2
+for i = 1:numel(ISI_interval)
     xline(ISI_rangeStart(i))
     xline(ISI_rangeEnd(i))
     text(ISI_interval(i), ISI_pks(i)/2,...
         sprintf('Peak %i\nISI = %d ms\nPercentage = %d %%',i,round(ISI_interval(i)), round(ISI_probability(i)*100)))
 end
 xscale('log')
-xlim([0 10000])
+%xlim([0 10000])
 set(gca,'XTick', [10 100 1000 10000],'XTickLabel',[10 100 1000 10000])
 
 
@@ -577,7 +582,7 @@ colorbar
 set(gca,'PlotBoxAspectRatio', [1 1 1])
 
 %% Example: CAT analysis for the onset of one population burst
-whichBurst = 15;
+whichBurst = 9;
 
 singleCAT = computeCAT(BURST.burst_start_ms(whichBurst), BURST.burst_peak_ms(whichBurst), allspks, metadata, 5);
 
