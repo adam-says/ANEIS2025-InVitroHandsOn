@@ -582,7 +582,7 @@ colorbar
 set(gca,'PlotBoxAspectRatio', [1 1 1])
 
 %% Example: CAT analysis for the onset of one population burst
-whichBurst = 9;
+whichBurst = 18;
 
 singleCAT = computeCAT(BURST.burst_start_ms(whichBurst), BURST.burst_peak_ms(whichBurst), allspks, metadata, 5);
 

@@ -53,5 +53,6 @@ CAT.x = CAx;
 CAT.y = CAy;
 CAT.t = time_bins(1:end-1);
 CAT.electrodeSpace = electrodeSpace;
+CAT.spatialSTH = spatialSTH;
 
 end %end function
