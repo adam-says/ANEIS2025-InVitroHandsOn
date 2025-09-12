@@ -26,7 +26,7 @@ function RiseSlopes = getRiseSlopes(smoothedbursts,binsize,normalize)
 
         Burst_rise = burst_profile(1:peak_idx);
     
-        RiseSlope_dt = diff(Burst_rise)/binsize^2;
+        RiseSlope_dt = diff(Burst_rise)/binsize;
 
         if isempty(RiseSlope_dt) == 1
            RiseSlopes(b) = nan;
