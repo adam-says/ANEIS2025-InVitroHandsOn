@@ -142,6 +142,7 @@ smoothISIdist = movmean(ISI.isiDist, 6);
 [pks,locs] = findpeaks(smoothISIdist(13:end), ISI.time_ms(13:end),...
     'NPeaks', 2,...
     'MinPeakDistance',100,...
+    'MinPeakProminence',0.001,...
     'WidthReference','halfheight');
 
 ISI_pks = pks;
@@ -150,6 +151,9 @@ ISI_interval = locs;
 %% Now we can determine the area under the curve to compute the cumulative
 % probability of finding ISI within the main ranges
 % For that, we will use the half-height as our boundaries
+ISI_rangeEnd = [];
+ISI_rangeStart = [];
+ISI_probability = [];
 for i = 1:numel(ISI_interval)
     pk_idx = find(ISI.time_ms == ISI_interval(i));
     halfheight = ISI_pks(i) / 2;
@@ -162,17 +166,18 @@ for i = 1:numel(ISI_interval)
     ISI_probability(i) = prob;
 end
 %
+figure
 plot(ISI.time_ms, smoothISIdist)
 hold on
 scatter(ISI_interval, ISI_pks,'filled')
-for i = 1:2
+for i = 1:numel(ISI_interval)
     xline(ISI_rangeStart(i))
     xline(ISI_rangeEnd(i))
     text(ISI_interval(i), ISI_pks(i)/2,...
         sprintf('Peak %i\nISI = %d ms\nPercentage = %d %%',i,round(ISI_interval(i)), round(ISI_probability(i)*100)))
 end
 xscale('log')
-xlim([0 10000])
+%xlim([0 10000])
 set(gca,'XTick', [10 100 1000 10000],'XTickLabel',[10 100 1000 10000])
 
 
@@ -269,7 +274,7 @@ sdAmpl = std(BURST.halfDecay_ms);
 iqrAmpl =  iqr(BURST.halfDecay_ms);
 
 violins = figure;
-violinplot(BURST(:,["TimeToPeak_ms","halfDecay_ms"]))
+violinplot(table2array(BURST(:,["TimeToPeak_ms","halfDecay_ms"])))
 
 ax = gca;
 ax.TickDir = "out";
@@ -277,6 +282,7 @@ ax.FontWeight = "bold";
 ax.FontSize = 12;
 set(gca,'TickLabelInterpreter', 'none');
 ylabel('Time (ms)','FontSize',14)
+set(ax,'XTickLabel',{"TimeToPeak_ms","halfDecay_ms"})
 
 %% (optional) do it yourself: perform burst detection on the other dataset 
 % and investigate the difference in one or more burst parameters
@@ -329,7 +335,8 @@ smoothedbursts = smoothdata(burst_profiles,2,'lowess',21);
 % option 3: smoothig with savitzky-golay filter
 smoothedbursts = sgolayfilt(burst_profiles',5,21)';
 
-%-plot bursts and smoothed bursts to check, pausing on each one
+%% -plot bursts and smoothed bursts to check, pausing on each one
+
 for b = 1:height(BURST)
 
     time_ms = (0:STH.bin:(size(burst_profiles,2)*STH.bin)-1);
@@ -358,10 +365,10 @@ end
 
 
 %option 1: without normalization
-RiseSlopes = getRiseSlopes(smoothedbursts,STH.bin,'No');
+RiseSlopes = getRiseSlopes(smoothedbursts,STH.bin,'no');
 
 %option 2: normalizing the bursts at their peak
-NormRiseSlopes = RiseSlopes(smoothedBursts,2,'yes');
+NormRiseSlopes = getRiseSlopes(smoothedbursts,2,'yes');
 
 %% Do it yourself: take the maximum of the derivatives and store them in an array
 
@@ -370,7 +377,7 @@ MaxRiseSlopes = cellfun(@max,RiseSlopes);
 
 %% (optional) Do It Yourself: plot burst, smoothed burst, derivative and max slope to check
 
-for j = 1:height(BURST)
+for j = 1 %:height(BURST)
 
     [~,peakIdx] = max(smoothedbursts(j,:));
     slope = RiseSlopes{j};
@@ -425,12 +432,12 @@ end
 
 %% Do it Yourself: plot original burst (fast+slow oscillations), fast and slow oscillations
 
-for j = 1:height(BURST)
+for j = 1 %:height(BURST)
 
     fast = fastOscillations(j,:);
     slow = slowOscialltions(j,:);
     burst = slow+fast;
-    time_ms = 0:STH.bin:(length(fast)*binsize)-1;
+    time_ms = 0:STH.bin:(length(fast)*STH.bin)-1;
 
     tiledlayout(2,1,'TileSpacing','tight')
 
@@ -462,15 +469,15 @@ for j = 1:height(BURST)
 end
 
 %% Spectrograms and power spectrum density
-
+whichBurst = 1;
 % example of spectrogram function usage
 Fs = STH.fs;
 windowLength = 20;
 overlap = 10;
 nfft = 256;
 
-fast = fastOscillations(b,:);
-fast_time_s = (0:binsize:length(fast)*binsize-1)/1000;
+fast = fastOscillations(whichBurst,:);
+fast_time_s = (0:STH.bin:length(fast)*STH.bin-1)/1000;
 [~,Fr,Time,power] = spectrogram(fast,windowLength,overlap,nfft,Fs,'yaxis');
 PSD = mean(power,2);
 [~,dominantFrequency_idx] = max(PSD);
@@ -484,7 +491,7 @@ imagesc(Time, Fr, power);
 axis xy;
 xlabel('Time (s)');
 ylabel('Frequency (Hz)');
-title(sprintf('Spectrogram (power) — burst %d', b));
+title(sprintf('Spectrogram (power) — burst %d', whichBurst));
 colorbar;
 colormap(jet);
 ylim([10 100]);
@@ -493,13 +500,13 @@ nexttile
 plot(fast_time_s,fast,'b-')
 xlim([Time(1) Time(end)])
 xlabel('Time (s)');
-title(sprintf('fast oscillation — burst %d', b));
+title(sprintf('fast oscillation — burst %d', whichBurst));
 
 nexttile
 plot(Fr,PSD,'r-')
 xlabel('Frequency (Hz)');
 ylabel('Power')
-title(sprintf('Power Spectrum Density — burst %d', b));
+title(sprintf('Power Spectrum Density — burst %d', whichBurst));
 
 %% Do it yourself: put the code above in a loop to obtain all spectrograms
 
@@ -575,7 +582,7 @@ colorbar
 set(gca,'PlotBoxAspectRatio', [1 1 1])
 
 %% Example: CAT analysis for the onset of one population burst
-whichBurst = 15;
+whichBurst = 18;
 
 singleCAT = computeCAT(BURST.burst_start_ms(whichBurst), BURST.burst_peak_ms(whichBurst), allspks, metadata, 5);
 
