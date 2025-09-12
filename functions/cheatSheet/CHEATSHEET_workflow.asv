@@ -287,6 +287,11 @@ set(gca,'TickLabelInterpreter', 'none');
 ylabel('Time (ms)','FontSize',14)
 set(ax,'XTickLabel',{"TimeToPeak (ms)","Duration (ms)"})
 
+%% (do it yourself: perform burst detection on the other dataset 
+% and investigate the difference in one or more burst parameters
+% easiest strategy: run the code twice and save burst table with different
+% names
+% better strategy: do it programmatically in loop
 
 
 %% =±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±=±
@@ -316,17 +321,10 @@ set(ax,'XTickLabel',{"TimeToPeak (ms)","Duration (ms)"})
 % of all the bursts aligned at their start. Their relative plot will show
 % the average one in red
 
-[burst_profiles,profiling_parameters,mean_burst] = burstProfiling(allspks,BURST,STH.bin,"start",1);
+[burst_profiles,profiling_parameters,mean_burst] = burstProfiling(allspks,BURST,STH.bin,"start",0);
 
 %% Do it yourself see how the average burst and the alignment change with the two methods
 %try to put show == 1
-
-%% do it yourself: perform burst detection and profiling on the other dataset 
-% and investigate the difference in one or more burst parameters
-% easiest strategy: run the code twice and save burst table with different
-% names
-% better strategy: do it programmatically in loop
-
 
 %% Do it yourself: smooth burst profiles
 % suggestion: use smoothdata function
@@ -345,9 +343,9 @@ smoothedbursts = sgolayfilt(burst_profiles',5,21)';
 for b = 1:height(BURST)
 
     time_ms = (0:STH.bin:(size(burst_profiles,2)*STH.bin)-1);
-    plot(time_ms, burst_profiles(b,:),'k-','LineWidth',2)
+    plot(time_ms, burst_profiles(b,:),'k-')
     hold on
-    plot(time_ms, smoothedbursts(b,:),'r--','LineWidth',2)
+    plot(time_ms, smoothedbursts(b,:),'r-')
     pause
     close
 
@@ -382,7 +380,7 @@ MaxRiseSlopes = cellfun(@max,RiseSlopes);
 
 %% (optional) Do It Yourself: plot burst, smoothed burst, derivative and max slope to check
 
-for j = 1:height(BURST)
+for j = 1 %:height(BURST)
 
     [~,peakIdx] = max(smoothedbursts(j,:));
     slope = RiseSlopes{j};
@@ -406,14 +404,7 @@ for j = 1:height(BURST)
     nexttile
     plot(slope,'r-','LineWidth',1.5)
     hold on
-    ax = gca;
-    ax.TickDir = "out";
-    ax.FontWeight = "bold";
-    ax.FontSize = 12;
-    set(gca,'TickLabelInterpreter', 'none');
-    legend('Derivative','Location','northwest')
     xlim([0 length(smoothedbursts(1:peakIdx))])
-
     pause
     
 end
@@ -444,7 +435,7 @@ end
 
 %% Do it Yourself: plot original burst (fast+slow oscillations), fast and slow oscillations
 
-for j = 1:height(BURST)
+for j = 1 %:height(BURST)
 
     fast = fastOscillations(j,:);
     slow = slowOscialltions(j,:);
@@ -524,7 +515,7 @@ title(sprintf('Power Spectrum Density — burst %d', whichBurst));
 
 [~,Fr,Time] = spectrogram(fastOscillations(1,:),windowLength,overlap,nfft,Fs,'yaxis');
 
-nsignals = height(BURST);
+nsignals = height(bursts);
 
 spectrograms = zeros(length(Fr),length(Time),nsignals);
 PSDs = zeros(nsignals,length(Fr));
@@ -532,14 +523,14 @@ dominantFrequencies = zeros(nsignals,1);
 
 for k = 1:nsignals
     
-    [~,~,~,power] = spectrogram(fastOscillations(k,:),windowLength,overlap,nfft,Fs,'yaxis');
+    [~,~,~,power] = spectrogram(fastOscillations(k,:),windowLength,overlap,nfft,fs,'yaxis');
     spectrograms(:,:,k) = power;
 
     PSDs(k,:) = mean(power,2);
     [~,dominantFrequency_idx] = max(PSDs(k,:));
     dominantFrequencies(k) = Fr(dominantFrequency_idx);
 
-    oscillationTime_s = (0:STH.bin:length(fastOscillations(k,:))*STH.bin-1)/1000;
+    oscillationTime_s = (0:binsize:length(fastOscillations(k,:))*binsize-1)/1000;
 
     tiledlayout(3,1,'TileSpacing','tight')
 
